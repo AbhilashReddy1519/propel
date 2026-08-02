@@ -1,17 +1,17 @@
-import { eq, sql } from "drizzle-orm";
-import { db } from "../index.js";
-import logger from "@/utils/logger.js";
-import { generateNetwork } from "./networkGenerator.js";
-import { subStations } from "../schema/subStations.schema.js";
-import { feeders } from "../schema/feeders.schema.js";
-import { transformers } from "../schema/transformers.schema.js";
-import { poles } from "../schema/poles.schema.js";
-import { poleStates } from "../schema/polesStates.schema.js";
+import { eq, sql } from 'drizzle-orm';
+import { db } from '../index.js';
+import logger from '@/utils/logger.js';
+import { generateNetwork } from './networkGenerator.js';
+import { subStations } from '../schema/subStations.schema.js';
+import { feeders } from '../schema/feeders.schema.js';
+import { transformers } from '../schema/transformers.schema.js';
+import { poles } from '../schema/poles.schema.js';
+import { poleStates } from '../schema/polesStates.schema.js';
 
 const BATCH_SIZE = 500;
 
-async function batched<T>(rows: T[], fn:(chunk: T[]) => Promise<unknown>) {
-  for(let i = 0;i < rows.length;i++) {
+async function batched<T>(rows: T[], fn: (chunk: T[]) => Promise<unknown>) {
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     await fn(rows.slice(i, i + BATCH_SIZE));
   }
 }
@@ -24,7 +24,6 @@ async function resetTables() {
     CASCADE
   `);
 }
-
 
 async function seed() {
   await resetTables();
@@ -100,7 +99,7 @@ async function seed() {
       .values(chunk.map((p) => ({ poleId: p.id, currentState: 'unknown' as const }))),
   );
 
-  logger.info("Seed complete.");
+  logger.info('Seed complete.');
   process.exit(0);
 }
 
