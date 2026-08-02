@@ -15,7 +15,7 @@ export const poles = pgTable('poles', {
   lon: doublePrecision('lon').notNull(),
   pincode: text('pincode'),
   deviceId: text('device_id').unique(),
-  parentPoleId: text('parent_pole_ id').references((): AnyPgColumn => poles.id),
+  parentPoleId: text('parent_pole_id').references((): AnyPgColumn => poles.id),
   seqOnLine: integer('seq_on_line'),
   topologyConfidence: topologyConfidenceEnum('topology_confidence').notNull().default('known'),
 });

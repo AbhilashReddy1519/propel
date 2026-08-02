@@ -39,7 +39,7 @@
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
     // Paths & Modules
-    "baseUrl": ".",
+    // "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@config/*": ["./src/config/*"],
