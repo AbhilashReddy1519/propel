@@ -1,5 +1,5 @@
 import { pgTable, text } from 'drizzle-orm/pg-core';
-import { subStations } from './substations.schema.js';
+import { subStations } from './subStations.schema.js';
 
 export const feeders = pgTable('feeders', {
   id: text('id').primaryKey().notNull(),

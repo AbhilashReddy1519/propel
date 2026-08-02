@@ -1,0 +1,21 @@
+services:
+  propel-db-service:
+    image: postgres:16
+    container_name: propel-db
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - 4000:5432
+    expose:
+      - 5432
+    volumes:
+      - propel-data:/var/lib/postgresql/data
+    networks:
+      - propel
+
+volumes:
+  propel-data:
+
+networks:
+  propel:
