@@ -34,16 +34,20 @@ export const FaultInjectorForm: React.FC<FaultInjectorFormProps> = ({
     if (!selectedDtId) return;
 
     let isMounted = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadingPoles(true);
     setError(null);
 
     listPolesForDt(selectedDtId)
       .then((data) => {
         if (isMounted) {
-          setPoles(data);
-          onPolesLoaded(data);
-          if (data.length > 0 && !selectedPoleId) {
-            onSelectPole(data[0].id);
+          const sortedPoles = [...data].sort((a, b) =>
+            a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' })
+          );
+          setPoles(sortedPoles);
+          onPolesLoaded(sortedPoles);
+          if (sortedPoles.length > 0 && !selectedPoleId) {
+            onSelectPole(sortedPoles[0].id);
           }
         }
       })

@@ -18,6 +18,12 @@ export const TransitionActions: React.FC<TransitionActionsProps> = ({
   const [submittingStatus, setSubmittingStatus] = useState<IncidentStatus | null>(null);
   const [conflictError, setConflictError] = useState<string | null>(null);
 
+  // Clear error state whenever selected incident changes
+  React.useEffect(() => {
+    setConflictError(null);
+    setSubmittingStatus(null);
+  }, [incident.id]);
+
   const allowedNextStatuses = ALLOWED_NEXT[incident.status] || [];
 
   const handleTransition = async (targetStatus: IncidentStatus) => {

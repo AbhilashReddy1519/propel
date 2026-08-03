@@ -17,6 +17,12 @@ export const RepairButton: React.FC<RepairButtonProps> = ({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Clear error state when selected incident changes
+  React.useEffect(() => {
+    setError(null);
+    setSubmitting(false);
+  }, [selectedIncident?.id]);
+
   const handleRepair = async () => {
     if (!selectedIncident) return;
 

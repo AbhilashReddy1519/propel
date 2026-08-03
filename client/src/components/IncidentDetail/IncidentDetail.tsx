@@ -167,6 +167,7 @@ export const IncidentDetail: React.FC<IncidentDetailProps> = ({
       {/* Operator Legal Transition Action Buttons */}
       <div style={{ padding: 'var(--space-3)', backgroundColor: 'rgba(255,255,255,0.01)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--panel-border)' }}>
         <TransitionActions
+          key={incident.id}
           incident={incident}
           operatorName={operatorName}
           onSuccess={onIncidentUpdated}

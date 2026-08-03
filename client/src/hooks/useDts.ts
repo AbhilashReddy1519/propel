@@ -18,7 +18,10 @@ export function useDts(): UseDtsResult {
     try {
       setLoading(true);
       const data = await listDts();
-      setDts(data);
+      const sortedData = [...data].sort((a, b) =>
+        a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' })
+      );
+      setDts(sortedData);
       setError(null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load DT network context';
