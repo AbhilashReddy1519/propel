@@ -1,0 +1,44 @@
+:root {
+  /* base */
+  --bg-primary: #07111f;
+  --bg-gradient: linear-gradient(135deg, #07111f 0%, #0f1e34 100%);
+  --panel-bg: rgba(7, 17, 31, 0.92);
+  --panel-border: #223554;
+  --text-primary: #f5f7ff;
+  --text-muted: #7d93b4;
+
+  /* status colors -- ONE per status, none shared */
+  --status-detected-fg: #ff4d5e;
+  --status-detected-bg: #5a1d2b;
+  --status-acknowledged-fg: #ffb84d;
+  --status-acknowledged-bg: #5a3a1d;
+  --status-crew-assigned-fg: #66b5ff;
+  --status-crew-assigned-bg: #1d3a5a;
+  --status-resolved-fg: #ffe59a;
+  --status-resolved-bg: #65520f;
+  --status-verified-fg: #b3f4d2;
+  --status-verified-bg: #174733;
+  --status-closed-fg: #b3f4d2;
+  --status-closed-bg: #174733;
+  --status-muted-fg: #8ba6c8;
+  --status-muted-bg: #1a2536;
+
+  /* confidence badges -- a SEPARATE visual channel from status */
+  --confidence-known-fg: #7CFFB2;
+  --confidence-inferred-fg: #FFC46B;
+  --confidence-range-fg: #FF8F73;
+
+  /* spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* radii */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+}
