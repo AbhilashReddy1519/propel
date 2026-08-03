@@ -1,3 +1,4 @@
+// server/src/services/incidentService.ts
 import { randomUUID } from 'crypto';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db/index.js';
@@ -7,15 +8,22 @@ import { poles } from '@/db/schema/poles.schema.js';
 import { transformers } from '@/db/schema/transformers.schema.js';
 import { scheduledOutages } from '@/db/schema/scheduledOutages.schema.js';
 import type { FrontierEdge } from './localization.js';
+import { getCurrentFrontiers } from './localizationService.js';
 import logger from '@/utils/logger.js';
 
 const DEBOUNCE_MS = 45_000; // spec's stated 30-60s window, midpoint
 const OPEN_STATUSES = ['detected', 'acknowledged', 'crew_assigned', 'resolved'] as const;
 
-// In-process debounce tracker. Single-instance deployment matches the rest
-// of the stack's "no external queue" simplicity -- a server restart mid-
-// debounce just costs one extra detection cycle, not correctness.
-const pendingFrontiers = new Map<string, number>(); // "dtId:childPoleId" -> firstSeenAt (ms)
+// edgeKey -> timer handle. The timer itself IS the debounce clock: it
+// fires exactly once, DEBOUNCE_MS after first sighting, and re-derives the
+// frontier list fresh at fire time rather than trusting a snapshot from
+// when it started. This is self-driving -- it does NOT depend on
+// recomputeFrontiersForDt happening to be called again by some unrelated
+// telemetry event within the window. (An earlier version of this file did
+// depend on that, which meant a fault in an otherwise-quiet DT could sit
+// in "pending" forever and never actually get ticketed -- confirmed by
+// simulation, not just suspected.)
+const pendingTimers = new Map<string, NodeJS.Timeout>();
 
 function edgeKey(dtId: string, childPoleId: string) {
   return `${dtId}:${childPoleId}`;
@@ -37,8 +45,6 @@ async function isWithinScheduledOutage(dtId: string): Promise<boolean> {
     .where(inArray(scheduledOutages.targetId, [dtId, dt.feederId]));
 
   const now = Date.now();
-  // Grace applies to the END only -- a shutdown that hasn't started yet
-  // shouldn't suppress an unrelated fault happening early.
   return windows.some((w) => now >= w.start.getTime() && now <= w.end.getTime() + OVERRUN_GRACE_MS);
 }
 
@@ -58,6 +64,13 @@ async function findOpenIncident(dtId: string, childPoleId: string) {
 }
 
 async function createIncident(dtId: string, frontier: FrontierEdge) {
+  // Re-check for an existing open incident right before writing -- closes
+  // a narrow race where two debounce timers for the same edge could both
+  // reach here (shouldn't happen given the pendingTimers.has() guard below,
+  // but cheap insurance against a duplicate row on a self-referencing edge).
+  const already = await findOpenIncident(dtId, frontier.childPoleId);
+  if (already) return;
+
   const [childPole] = await db
     .select({ lat: poles.lat, lon: poles.lon, pincode: poles.pincode })
     .from(poles)
@@ -97,13 +110,45 @@ async function createIncident(dtId: string, frontier: FrontierEdge) {
   );
 }
 
+function scheduleDebouncedCreate(dtId: string, frontier: FrontierEdge) {
+  const key = edgeKey(dtId, frontier.childPoleId);
+  if (pendingTimers.has(key)) return; // already debouncing this exact edge
+
+  const timer = setTimeout(async () => {
+    pendingTimers.delete(key);
+    try {
+      const stillOpen = await findOpenIncident(dtId, frontier.childPoleId);
+      if (stillOpen) return;
+
+      // Re-derive freshly -- don't trust the frontier object captured
+      // DEBOUNCE_MS ago. If it flickered and resolved itself in the
+      // meantime, it correctly never gets ticketed.
+      const fresh = await getCurrentFrontiers(dtId);
+      const stillPresent = fresh.find((f) => f.childPoleId === frontier.childPoleId);
+      if (stillPresent) {
+        await createIncident(dtId, stillPresent);
+      }
+    } catch (err) {
+      logger.error(`Debounced incident check failed for ${key}: ${err}`);
+    }
+  }, DEBOUNCE_MS);
+
+  pendingTimers.set(key, timer);
+}
+
+function cancelPending(dtId: string, childPoleId: string) {
+  const key = edgeKey(dtId, childPoleId);
+  const timer = pendingTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    pendingTimers.delete(key);
+  }
+}
+
 /**
  * Any open incident whose frontier edge no longer appears in the current
  * frontier list has had its poles come back live -- telemetry proved the
- * fix, not a button click. Moves straight to 'verified' regardless of
- * where it was in the manual pipeline (detected/acknowledged/crew_assigned/
- * resolved) -- if the crew fixed it without ever clicking "resolved," the
- * system should still catch that rather than leave a stale open ticket.
+ * fix, not a button click.
  */
 async function verifyRecoveredIncidents(dtId: string, currentFrontierChildIds: Set<string>) {
   const openInDt = await db
@@ -133,31 +178,19 @@ async function verifyRecoveredIncidents(dtId: string, currentFrontierChildIds: S
 
 /** Called after every findFrontiers() run for a DT. */
 export async function reconcileIncidentsForDt(dtId: string, frontiers: FrontierEdge[]) {
-  const now = Date.now();
   const currentChildIds = new Set(frontiers.map((f) => f.childPoleId));
 
-  // Clear debounce timers for frontiers that vanished before their timer
-  // elapsed -- a flicker, not a real fault, shouldn't leave stale state.
-  for (const key of [...pendingFrontiers.keys()]) {
+  // Cancel debounce timers for edges that vanished before firing -- a
+  // flicker, not a real fault, shouldn't leave a stale timer running.
+  for (const key of [...pendingTimers.keys()]) {
     const [keyDt, keyChild] = key.split(':');
-    if (keyDt === dtId && !currentChildIds.has(keyChild!)) pendingFrontiers.delete(key);
+    if (keyDt === dtId && !currentChildIds.has(keyChild!)) cancelPending(dtId, keyChild!);
   }
 
   for (const frontier of frontiers) {
     const existingIncident = await findOpenIncident(dtId, frontier.childPoleId);
-    if (existingIncident) continue; // already ticketed
-
-    const key = edgeKey(dtId, frontier.childPoleId);
-    const firstSeenAt = pendingFrontiers.get(key);
-
-    if (firstSeenAt === undefined) {
-      pendingFrontiers.set(key, now); // first sighting -- start the clock, don't ticket yet
-      continue;
-    }
-    if (now - firstSeenAt >= DEBOUNCE_MS) {
-      await createIncident(dtId, frontier);
-      pendingFrontiers.delete(key);
-    }
+    if (existingIncident) continue; // already ticketed, nothing to do
+    scheduleDebouncedCreate(dtId, frontier);
   }
 
   await verifyRecoveredIncidents(dtId, currentChildIds);

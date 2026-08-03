@@ -1,4 +1,3 @@
-// server/src/services/localizationService.ts
 import { eq } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { poles } from '@/db/schema/poles.schema.js';
