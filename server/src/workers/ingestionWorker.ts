@@ -1,5 +1,5 @@
 // server/src/workers/ingestionWorker.ts
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { eq, isNull, sql } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { telemetryRaw } from '@/db/schema/telemetryRaw.schema.js';
 import { poles } from '@/db/schema/poles.schema.js';
