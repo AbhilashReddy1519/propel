@@ -19,10 +19,7 @@ const ALLOWED_NEXT: Record<string, string[]> = {
   verified: ['closed'],
 };
 
-async function frontierPoleStillDark(
-  dtId: string,
-  frontierChildPoleId: string | null,
-): Promise<boolean> {
+async function frontierPoleStillDark(frontierChildPoleId: string | null): Promise<boolean> {
   if (!frontierChildPoleId) return false;
   const [row] = await db
     .select({ currentState: poleStates.currentState })
@@ -48,7 +45,7 @@ export async function transitionIncident(incidentId: string, payload: Transition
   // can be marked resolved. A lineman's click alone is not enough.
   if (
     payload.status === 'resolved' &&
-    (await frontierPoleStillDark(incident.dtId, incident.frontierChildPoleId))
+    (await frontierPoleStillDark(incident.frontierChildPoleId))
   ) {
     throw new ConflictError(
       'Cannot mark resolved -- the affected pole is still reporting dark. Wait for telemetry to confirm restoration.',
