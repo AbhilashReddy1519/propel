@@ -49,7 +49,8 @@
       "@validations/*": ["./src/validations/*"],
       "@exceptions/*": ["./src/exceptions/*"],
       "@routes/*": ["./src/routes/*"],
-      "@types/*": ["./src/types/*"]
+      "@types/*": ["./src/types/*"],
+      "@modules/*": ["./src/modules/*"]
     },
 
     // Type Definitions

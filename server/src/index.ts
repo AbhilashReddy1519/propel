@@ -1,6 +1,8 @@
 import { App } from './app.js';
 import config from '@config/env.js';
 import logger from '@utils/logger.js';
+import { startIngestionWorker } from './workers/ingestionWorker.js';
+import { startHeartbeatWorker } from './workers/heartbeatWorker.js';
 
 const app = new App().getApp();
 
@@ -13,6 +15,9 @@ const startServer = async () => {
       logger.info(`Server URL: http://localhost:${config.port}`);
       logger.info(`Started at: ${new Date().toISOString()}`);
     });
+
+    startIngestionWorker();
+    startHeartbeatWorker();
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {

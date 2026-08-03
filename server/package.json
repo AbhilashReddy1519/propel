@@ -10,7 +10,6 @@
     "dev": "tsx watch src/index.ts",
     "clean": "rm -rf dist",
     "clean:logs": "rm -rf logs",
-    
     "db:seed": "tsx src/db/seed/seed.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -56,6 +55,7 @@
     "hpp": "^0.2.3",
     "morgan": "^1.11.0",
     "pg": "^8.22.0",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "zod": "^4.4.3"
   }
 }
