@@ -1,4 +1,3 @@
-// server/src/workers/ingestionWorker.ts
 import { eq, isNull, sql } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { telemetryRaw } from '@/db/schema/telemetryRaw.schema.js';

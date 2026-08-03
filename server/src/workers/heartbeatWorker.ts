@@ -1,4 +1,3 @@
-// server/src/workers/heartbeatWorker.ts
 import { and, eq, lt, ne } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { poles } from '@/db/schema/poles.schema.js';
