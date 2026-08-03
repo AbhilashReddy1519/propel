@@ -2,9 +2,6 @@ const getBaseUrl = (): string => {
   if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_BASE) {
     return process.env.NEXT_PUBLIC_API_BASE;
   }
-  if (typeof process !== 'undefined' && process.env.VITE_API_BASE) {
-    return process.env.VITE_API_BASE;
-  }
   return 'http://localhost:3000/api/v1';
 };
 
