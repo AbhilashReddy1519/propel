@@ -1,4 +1,4 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 dotenv.config();
 
 interface Config {
@@ -27,7 +27,7 @@ const config: Config = {
     url: process.env['DATABASE_URL'] || '',
   },
   cors: {
-    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
+    origin: (process.env.CORS_ORIGIN || 'http://localhost:3000,http://localhost:5173').split(','),
   },
   LogLevel: process.env.LogLevel || 'info',
 };
