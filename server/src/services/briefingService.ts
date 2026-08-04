@@ -3,7 +3,7 @@ import logger from '@/utils/logger.js';
 import type { FrontierEdge } from './localization.js';
 
 const AI_TIMEOUT_MS = 4000;
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'llama-3.3-70b-versatile';
 
 export interface BriefingContext {
   dtId: string;
@@ -40,8 +40,8 @@ function buildTemplateBriefing(ctx: BriefingContext): string {
 }
 
 async function callAi(ctx: BriefingContext): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error('GROQ_API_KEY not configured');
 
   const prompt = [
     'Write ONE short, plain sentence for a control-room ticket header,',
@@ -63,16 +63,15 @@ async function callAi(ctx: BriefingContext): Promise<string> {
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 100,
+        max_completion_tokens: 100,
         messages: [{ role: 'user', content: prompt }],
       }),
       signal: controller.signal,
@@ -82,10 +81,10 @@ async function callAi(ctx: BriefingContext): Promise<string> {
       throw new Error(`AI API returned ${response.status}`);
     }
 
-    interface AnthropicResponse {
+    interface GroqResponse {
       content?: { type: string; text?: string }[];
     }
-    const data = (await response.json()) as AnthropicResponse;
+    const data = (await response.json()) as GroqResponse;
     const text = data.content?.find((b) => b.type === 'text')?.text;
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       throw new Error('AI API returned no usable text');
