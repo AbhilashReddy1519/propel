@@ -20,8 +20,16 @@ export default function OperatorConsolePage() {
 
   // Selection states
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
+  const [selectedDtId, setSelectedDtId] = useState<string>('');
   const [selectedPoleId, setSelectedPoleId] = useState<string>('');
   const [simulatorPoles, setSimulatorPoles] = useState<PoleSummary[]>([]);
+
+  // Automatically select first DT if none selected
+  useEffect(() => {
+    if (dts.length > 0 && !selectedDtId) {
+      setSelectedDtId(dts[0].id);
+    }
+  }, [dts, selectedDtId]);
 
   // Automatically select first incident on load or if selected incident disappears
   useEffect(() => {
@@ -86,6 +94,7 @@ export default function OperatorConsolePage() {
               onSelectIncident={handleSelectIncident}
               simulatorPoles={simulatorPoles}
               selectedPoleId={selectedPoleId}
+              selectedDtId={selectedDtId}
               onSelectPole={setSelectedPoleId}
             />
           </div>
@@ -107,6 +116,8 @@ export default function OperatorConsolePage() {
           selectedIncident={selectedIncident}
           operatorName={operatorName}
           selectedPoleId={selectedPoleId}
+          selectedDtId={selectedDtId}
+          onSelectDt={setSelectedDtId}
           onSelectPole={setSelectedPoleId}
           onPolesLoaded={setSimulatorPoles}
           onActionComplete={refetch}

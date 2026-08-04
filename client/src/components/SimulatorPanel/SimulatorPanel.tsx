@@ -9,6 +9,8 @@ interface SimulatorPanelProps {
   selectedIncident: IncidentRow | null;
   operatorName: string;
   selectedPoleId: string;
+  selectedDtId?: string;
+  onSelectDt?: (dtId: string) => void;
   onSelectPole: (poleId: string) => void;
   onPolesLoaded: (poles: PoleSummary[]) => void;
   onActionComplete: () => void;
@@ -19,22 +21,24 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
   selectedIncident,
   operatorName,
   selectedPoleId,
+  selectedDtId: propsSelectedDtId,
+  onSelectDt: propsOnSelectDt,
   onSelectPole,
   onPolesLoaded,
   onActionComplete,
 }) => {
-  const [selectedDtId, setSelectedDtId] = useState<string>('');
+  const [internalSelectedDtId, setInternalSelectedDtId] = useState<string>('');
   const [bannerMessage, setBannerMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+
+  const selectedDtId = propsSelectedDtId !== undefined ? propsSelectedDtId : internalSelectedDtId;
+  const setSelectedDtId = propsOnSelectDt || setInternalSelectedDtId;
 
   // Set default DT when DT list loads
   React.useEffect(() => {
     if (dts.length > 0 && !selectedDtId) {
-      // Defer setting state to avoid synchronous setState inside effect which can
-      // cause cascading renders. Using a microtask to schedule the update.
-      const t = setTimeout(() => setSelectedDtId(dts[0].id), 0);
-      return () => clearTimeout(t);
+      setSelectedDtId(dts[0].id);
     }
-  }, [dts, selectedDtId]);
+  }, [dts, selectedDtId, setSelectedDtId]);
 
   const handleFaultSuccess = (res: InjectFaultResponse) => {
     setBannerMessage({

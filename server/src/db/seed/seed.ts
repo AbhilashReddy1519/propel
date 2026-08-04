@@ -13,16 +13,19 @@ const BATCH_SIZE = 500;
 async function batched<T>(rows: T[], fn: (chunk: T[]) => Promise<unknown>) {
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     await fn(rows.slice(i, i + BATCH_SIZE));
+    logger.info(`${i} batch done`);
   }
 }
 
 async function resetTables() {
-  await db.execute(sql`
+  await db.execute(
+  sql`
     TRUNCATE TABLE
       incident_events, incidents, telemetry_raw, pole_states,
       poles, transformers, feeders, sub_stations
     CASCADE
-  `);
+  `
+  );
 }
 
 async function seed() {

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup, Marker, useMap } from 'react-leaflet';
+import React, { useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { IncidentRow, DtSummary, PoleSummary } from '../../types/api';
 import { STATUS_STYLE } from '../../utils/statusStyles';
@@ -11,17 +11,37 @@ interface NetworkMapInnerProps {
   onSelectIncident: (incident: IncidentRow) => void;
   simulatorPoles?: PoleSummary[];
   selectedPoleId?: string;
+  selectedDtId?: string;
   onSelectPole?: (poleId: string) => void;
 }
 
-// Component to dynamically fit bounds or recenter when selection changes
-const MapRecenter: React.FC<{ center: [number, number]; zoom?: number }> = ({ center, zoom }) => {
+// Recenter component that ONLY moves map when selectedIncidentId changes or on initial load,
+// preventing annoying view resets during 4.5s background polling.
+const MapRecenter: React.FC<{ selectedIncidentId: string | null; center: [number, number]; zoom?: number }> = ({
+  selectedIncidentId,
+  center,
+  zoom,
+}) => {
   const map = useMap();
+  const prevIdRef = useRef<string | null>(null);
+  const initialCenteredRef = useRef<boolean>(false);
+
   useEffect(() => {
-    if (center && center[0] && center[1]) {
-      map.setView(center, zoom || map.getZoom());
+    // Initial centering once on mount
+    if (!initialCenteredRef.current && center && center[0] && center[1]) {
+      map.setView(center, zoom || 13);
+      initialCenteredRef.current = true;
+      prevIdRef.current = selectedIncidentId;
+      return;
     }
-  }, [center, zoom, map]);
+
+    // Only recenter when operator selects a DIFFERENT incident
+    if (selectedIncidentId && selectedIncidentId !== prevIdRef.current && center && center[0] && center[1]) {
+      map.setView(center, zoom || map.getZoom());
+      prevIdRef.current = selectedIncidentId;
+    }
+  }, [selectedIncidentId, center, zoom, map]);
+
   return null;
 };
 
@@ -50,9 +70,10 @@ export const NetworkMapInner: React.FC<NetworkMapInnerProps> = ({
   onSelectIncident,
   simulatorPoles = [],
   selectedPoleId,
+  selectedDtId,
   onSelectPole,
 }) => {
-  // Default center (Bangalore / India coordinates fallback, or first incident/DT location)
+  // Default center (Bangalore / India coordinates fallback)
   const defaultCenter: [number, number] = [12.9716, 77.5946];
 
   const selectedIncident = incidents.find((i) => i.id === selectedIncidentId);
@@ -72,7 +93,7 @@ export const NetworkMapInner: React.FC<NetworkMapInnerProps> = ({
         style={{ width: '100%', height: '100%' }}
         zoomControl={true}
       >
-        <MapRecenter center={activeCenter} />
+        <MapRecenter selectedIncidentId={selectedIncidentId} center={activeCenter} />
 
         {/* Dark map tiles */}
         <TileLayer
@@ -80,22 +101,31 @@ export const NetworkMapInner: React.FC<NetworkMapInnerProps> = ({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        {/* Section 5.2 Requirement: Background DT Context Dots (#3a4d6b, radius 3-4px, no popup) */}
+        {/* Background DT Transformer Markers (Distinct Cyan/Teal color with hover tooltips) */}
         {dts.map((dt) => (
           <CircleMarker
             key={`dt-bg-${dt.id}`}
             center={[dt.lat, dt.lon]}
-            radius={4}
+            radius={5}
             pathOptions={{
-              color: '#3a4d6b',
-              fillColor: '#223554',
-              fillOpacity: 0.8,
-              weight: 1,
+              color: '#0284c7', // Cyan border
+              fillColor: '#38bdf8', // Distinct Cyan fill
+              fillOpacity: 0.9,
+              weight: 1.5,
             }}
-          />
+          >
+            {/* Hover Tooltip showing Transformer ID */}
+            <Tooltip direction="top" offset={[0, -6]} opacity={0.95} sticky>
+              <div style={{ fontSize: '11px', fontWeight: 600, color: '#0f1e34' }}>
+                ⚡ Transformer (DT): <strong>{dt.id}</strong>
+                <br />
+                Feeder: {dt.feederId} | Poles: {dt.poleCount} | Capacity: {dt.capacityKva} kVA
+              </div>
+            </Tooltip>
+          </CircleMarker>
         ))}
 
-        {/* Simulator Target Poles Context (if active in simulator) */}
+        {/* Simulator Target Poles Context with Hover Tooltips showing Pole ID & Transformer ID */}
         {simulatorPoles.map((pole) => {
           const isPoleSelected = pole.id === selectedPoleId;
           return (
@@ -104,18 +134,31 @@ export const NetworkMapInner: React.FC<NetworkMapInnerProps> = ({
               center={[pole.lat, pole.lon]}
               radius={isPoleSelected ? 7 : 5}
               pathOptions={{
-                color: isPoleSelected ? '#FFC46B' : '#6b4a1a',
-                fillColor: isPoleSelected ? '#FFC46B' : '#ffb84d',
-                fillOpacity: isPoleSelected ? 1 : 0.6,
+                color: isPoleSelected ? '#FFC46B' : '#d97706',
+                fillColor: isPoleSelected ? '#FFC46B' : '#fbbf24',
+                fillOpacity: isPoleSelected ? 1 : 0.7,
                 weight: isPoleSelected ? 2 : 1,
               }}
               eventHandlers={{
                 click: () => onSelectPole && onSelectPole(pole.id),
               }}
             >
+              {/* Hover Tooltip displaying Transformer ID & Pole ID */}
+              <Tooltip direction="top" offset={[0, -6]} opacity={0.95} sticky>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#0f1e34' }}>
+                  📍 Pole ID: <strong>{pole.id}</strong>
+                  <br />
+                  Transformer (DT): <strong>{selectedDtId || 'N/A'}</strong>
+                  <br />
+                  Device Attached: {pole.hasDevice ? 'Yes' : 'No'}
+                </div>
+              </Tooltip>
+
               <Popup>
                 <div style={{ fontSize: '12px' }}>
                   <strong>Pole: {pole.id}</strong>
+                  <br />
+                  Transformer: <strong>{selectedDtId || 'N/A'}</strong>
                   <br />
                   Device: {pole.hasDevice ? 'Yes' : 'No'}
                   <br />
@@ -124,13 +167,14 @@ export const NetworkMapInner: React.FC<NetworkMapInnerProps> = ({
                       onClick={() => onSelectPole(pole.id)}
                       style={{
                         marginTop: '4px',
-                        padding: '2px 6px',
+                        padding: '3px 8px',
                         fontSize: '11px',
                         background: '#6b4a1a',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '4px',
                         cursor: 'pointer',
+                        fontWeight: 600,
                       }}
                     >
                       Select as Simulator Target
@@ -157,6 +201,17 @@ export const NetworkMapInner: React.FC<NetworkMapInnerProps> = ({
                 click: () => onSelectIncident(incident),
               }}
             >
+              {/* Hover Tooltip showing Incident & DT Transformer details */}
+              <Tooltip direction="top" offset={[0, -12]} opacity={0.95} sticky>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: '#0f1e34' }}>
+                  ⚠️ Incident {incident.id.slice(0, 8)}...
+                  <br />
+                  Transformer (DT): <strong>{incident.dtId}</strong>
+                  <br />
+                  Status: <strong>{statusStyle.label}</strong>
+                </div>
+              </Tooltip>
+
               <Popup>
                 <div style={{ fontSize: '12px', minWidth: '160px' }}>
                   <div style={{ fontWeight: 700, marginBottom: '4px', color: 'var(--text-primary)' }}>
@@ -214,8 +269,12 @@ export const NetworkMapInner: React.FC<NetworkMapInnerProps> = ({
       >
         <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>Map Legend</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#3a4d6b' }} />
-          <span>Network DT Context ({dts.length})</span>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#38bdf8', border: '1px solid #0284c7' }} />
+          <span>Transformer (DT Context) ({dts.length})</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#fbbf24', border: '1px solid #d97706' }} />
+          <span>Target Pole (Sim Context)</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--status-detected-fg)' }} />

@@ -9,6 +9,7 @@ interface NetworkMapProps {
   onSelectIncident: (incident: IncidentRow) => void;
   simulatorPoles?: PoleSummary[];
   selectedPoleId?: string;
+  selectedDtId?: string;
   onSelectPole?: (poleId: string) => void;
 }
 
