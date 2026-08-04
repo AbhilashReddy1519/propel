@@ -1,5 +1,14 @@
 import winston from "winston";
 import config from "@/config/env.js";
+import fs from "fs";
+
+if (!fs.existsSync('logs')) {
+  try {
+    fs.mkdirSync('logs', { recursive: true });
+  } catch {
+    // Ignore if directory creation fails or exists
+  }
+}
 
 const logLevels = {
   error: 0,

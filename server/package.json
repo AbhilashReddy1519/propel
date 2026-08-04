@@ -5,10 +5,10 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist .tsbuildinfo",
     "clean:logs": "rm -rf logs",
     "db:seed": "tsx src/db/seed/seed.ts",
     "db:generate": "drizzle-kit generate",
@@ -43,6 +43,7 @@
     "husky": "^9.1.7",
     "prettier": "^3.9.6",
     "ts-node": "^10.9.2",
+    "tsc-alias": "^1.9.1",
     "typescript": "^7.0.2"
   },
   "dependencies": {
