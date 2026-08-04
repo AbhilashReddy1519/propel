@@ -54,6 +54,15 @@ export const TransitionActions: React.FC<TransitionActionsProps> = ({
   };
 
   if (allowedNextStatuses.length === 0) {
+    if (incident.status === 'resolved') {
+      return (
+        <div style={{ fontSize: '13px', color: 'var(--status-resolved-fg)', fontStyle: 'italic' }}>
+          Marked resolved by crew, awaiting telemetry confirmation. This will move to
+          &quot;Verified&quot; automatically once the affected pole reports live again --
+          no manual action can advance it from here.
+        </div>
+      );
+    }
     return (
       <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
         Ticket reached final state ({incident.status}). No further actions available.

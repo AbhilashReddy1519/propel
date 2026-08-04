@@ -20,6 +20,8 @@ export interface IncidentRow {
   lon: number;
   pincode: string | null;
   reasoning: string;
+  briefing: string | null;
+  briefingSource: 'ai' | 'template' | null;
   suppressedBySchedule: boolean;
   createdAt: string;
   resolvedAt: string | null;

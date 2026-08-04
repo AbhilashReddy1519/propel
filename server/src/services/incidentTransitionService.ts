@@ -3,32 +3,27 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { incidents } from '@/db/schema/incidents.schema.js';
 import { incidentEvents } from '@/db/schema/incidentEvents.schema.js';
-import { poles } from '@/db/schema/poles.schema.js';
-import { poleStates } from '@/db/schema/polesStates.schema.js';
 import { ConflictError, NotFoundError } from '@/exceptions/http.exception.js';
 import type { TransitionPayload } from '@/modules/incidents/incident.validations.js';
 
 // 'verified' is deliberately absent from every list here -- that transition
-// is telemetry-only (see incidentService.verifyRecoveredIncidents), never
-// reachable through this manual endpoint.
+// is telemetry-only (see incidentService.verifyRecoveredIncidents).
+//
+// 'resolved' has NO manual next step. This is intentional, not an
+// oversight: 'resolved' represents the crew's honest, unconfirmed report
+// ("I believe I fixed it") and must be reachable regardless of what
+// telemetry currently says -- that's the whole point of having a separate
+// pending state. Only telemetry confirming restoration can advance a
+// ticket past 'resolved' to 'verified'; a manual resolved->closed path
+// would let an operator close a ticket that was never actually confirmed
+// fixed, which is exactly what "never closed by a button alone" rules out.
 const ALLOWED_NEXT: Record<string, string[]> = {
   detected: ['acknowledged'],
   acknowledged: ['crew_assigned'],
   crew_assigned: ['resolved'],
-  resolved: ['closed'],
+  resolved: [],
   verified: ['closed'],
 };
-
-async function frontierPoleStillDark(frontierChildPoleId: string | null): Promise<boolean> {
-  if (!frontierChildPoleId) return false;
-  const [row] = await db
-    .select({ currentState: poleStates.currentState })
-    .from(poles)
-    .leftJoin(poleStates, eq(poles.id, poleStates.poleId))
-    .where(eq(poles.id, frontierChildPoleId))
-    .limit(1);
-  return row ? row.currentState !== 'live' : false;
-}
 
 export async function transitionIncident(incidentId: string, payload: TransitionPayload) {
   const [incident] = await db.select().from(incidents).where(eq(incidents.id, incidentId)).limit(1);
@@ -38,17 +33,6 @@ export async function transitionIncident(incidentId: string, payload: Transition
   if (!legalTargets.includes(payload.status)) {
     throw new ConflictError(
       `Cannot move incident from '${incident.status}' to '${payload.status}'.`,
-    );
-  }
-
-  // The hard rule: telemetry must confirm restoration before this ticket
-  // can be marked resolved. A lineman's click alone is not enough.
-  if (
-    payload.status === 'resolved' &&
-    (await frontierPoleStillDark(incident.frontierChildPoleId))
-  ) {
-    throw new ConflictError(
-      'Cannot mark resolved -- the affected pole is still reporting dark. Wait for telemetry to confirm restoration.',
     );
   }
 

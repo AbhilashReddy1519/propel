@@ -9,6 +9,7 @@ import { transformers } from '@/db/schema/transformers.schema.js';
 import { scheduledOutages } from '@/db/schema/scheduledOutages.schema.js';
 import type { FrontierEdge } from './localization.js';
 import { getCurrentFrontiers } from './localizationService.js';
+import { generateBriefing } from './briefingService.js';
 import logger from '@/utils/logger.js';
 
 const DEBOUNCE_MS = 45_000; // spec's stated 30-60s window, midpoint
@@ -77,8 +78,24 @@ async function createIncident(dtId: string, frontier: FrontierEdge) {
     .where(eq(poles.id, frontier.childPoleId))
     .limit(1);
 
+  const [dt] = await db
+    .select({ householdsServed: transformers.householdsServed })
+    .from(transformers)
+    .where(eq(transformers.id, dtId))
+    .limit(1);
+
   const suppressed = await isWithinScheduledOutage(dtId);
   const id = randomUUID();
+
+  // AI briefing (or template fallback -- generateBriefing() never throws).
+  // Not on the hot path of localization/dedup correctness -- this runs
+  // once, after the edge has already settled through debounce.
+  const briefing = await generateBriefing({
+    dtId,
+    frontier,
+    pincode: childPole?.pincode ?? null,
+    householdsServed: dt?.householdsServed ?? null,
+  });
 
   await db.insert(incidents).values({
     id,
@@ -92,6 +109,8 @@ async function createIncident(dtId: string, frontier: FrontierEdge) {
     lon: childPole?.lon ?? 0,
     pincode: childPole?.pincode ?? null,
     reasoning: frontier.reasoning,
+    briefing: briefing.text,
+    briefingSource: briefing.source,
     suppressedBySchedule: suppressed,
   });
 
