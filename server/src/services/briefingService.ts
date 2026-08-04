@@ -82,11 +82,41 @@ async function callAi(ctx: BriefingContext): Promise<string> {
     }
 
     interface GroqResponse {
-      content?: { type: string; text?: string }[];
+      content?: { type: string; text?: string }[] | string | null;
+      choices?: Array<{
+        message?: {
+          content?: { type: string; text?: string }[] | string | null;
+        };
+      }>;
     }
+
+    function extractText(payload: unknown): string | null {
+      if (typeof payload === 'string') {
+        return payload.trim() || null;
+      }
+
+      if (Array.isArray(payload)) {
+        for (const entry of payload) {
+          if (typeof entry === 'string') {
+            return entry.trim() || null;
+          }
+
+          if (entry && typeof entry === 'object' && 'text' in entry) {
+            const text = (entry as { text?: unknown }).text;
+            if (typeof text === 'string' && text.trim().length > 0) {
+              return text.trim();
+            }
+          }
+        }
+        return null;
+      }
+
+      return null;
+    }
+
     const data = (await response.json()) as GroqResponse;
-    const text = data.content?.find((b) => b.type === 'text')?.text;
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    const text = extractText(data.content) ?? extractText(data.choices?.[0]?.message?.content);
+    if (!text || text.trim().length === 0) {
       throw new Error('AI API returned no usable text');
     }
     return text.trim();
