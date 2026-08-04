@@ -20,8 +20,10 @@ export const TransitionActions: React.FC<TransitionActionsProps> = ({
 
   // Clear error state whenever selected incident changes
   React.useEffect(() => {
-    setConflictError(null);
-    setSubmittingStatus(null);
+    return () => {
+      setConflictError(null);
+      setSubmittingStatus(null);
+    };
   }, [incident.id]);
 
   const allowedNextStatuses = ALLOWED_NEXT[incident.status] || [];

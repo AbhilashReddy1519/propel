@@ -25,13 +25,20 @@ export default function OperatorConsolePage() {
 
   // Automatically select first incident on load or if selected incident disappears
   useEffect(() => {
+    // Avoid synchronous setState during render/effect to prevent cascading renders.
+    // Schedule updates asynchronously so React can finish the current render pass.
+    let t: number | NodeJS.Timeout | null = null;
     if (incidents.length > 0) {
       if (!selectedIncidentId || !incidents.some((i) => i.id === selectedIncidentId)) {
-        setSelectedIncidentId(incidents[0].id);
+        t = setTimeout(() => setSelectedIncidentId(incidents[0].id), 0);
       }
     } else {
-      setSelectedIncidentId(null);
+      t = setTimeout(() => setSelectedIncidentId(null), 0);
     }
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (t) clearTimeout(t as any);
+    };
   }, [incidents, selectedIncidentId]);
 
   const selectedIncident = incidents.find((i) => i.id === selectedIncidentId) || null;

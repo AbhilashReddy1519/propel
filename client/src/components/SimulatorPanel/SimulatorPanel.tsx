@@ -29,7 +29,10 @@ export const SimulatorPanel: React.FC<SimulatorPanelProps> = ({
   // Set default DT when DT list loads
   React.useEffect(() => {
     if (dts.length > 0 && !selectedDtId) {
-      setSelectedDtId(dts[0].id);
+      // Defer setting state to avoid synchronous setState inside effect which can
+      // cause cascading renders. Using a microtask to schedule the update.
+      const t = setTimeout(() => setSelectedDtId(dts[0].id), 0);
+      return () => clearTimeout(t);
     }
   }, [dts, selectedDtId]);
 

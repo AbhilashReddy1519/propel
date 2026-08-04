@@ -32,7 +32,9 @@ export function useDts(): UseDtsResult {
   }, []);
 
   useEffect(() => {
-    fetchDts();
+    // Defer calling fetchDts to avoid synchronous setState inside effect
+    // which can cause cascading renders. Schedule on microtask queue.
+    void Promise.resolve().then(() => fetchDts());
   }, [fetchDts]);
 
   return { dts, loading, error, refetch: fetchDts };

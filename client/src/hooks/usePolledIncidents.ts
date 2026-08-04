@@ -28,7 +28,7 @@ export function usePolledIncidents(intervalMs: number = 4500): UsePolledIncident
   }, []);
 
   useEffect(() => {
-    fetchIncidents();
+    void Promise.resolve().then(() => fetchIncidents());
     const interval = setInterval(fetchIncidents, intervalMs);
     return () => clearInterval(interval);
   }, [fetchIncidents, intervalMs]);
