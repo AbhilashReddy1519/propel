@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc && tsc-alias",
+    "build": "tsc && tsc-alias && node -e \"fs.cpSync('src/db/drizzle', 'dist/db/drizzle', {recursive: true})\"",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
     "clean": "rm -rf dist .tsbuildinfo",

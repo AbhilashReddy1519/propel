@@ -19,16 +19,16 @@ async function batched<T>(rows: T[], fn: (chunk: T[]) => Promise<unknown>) {
 
 async function resetTables() {
   await db.execute(
-  sql`
-    TRUNCATE TABLE
-      incident_events, incidents, telemetry_raw, pole_states,
-      poles, transformers, feeders, sub_stations
-    CASCADE
-  `
+    sql`
+      TRUNCATE TABLE
+        incident_events, incidents, telemetry_raw, pole_states,
+        poles, transformers, feeders, sub_stations
+      CASCADE
+    `
   );
 }
 
-async function seed() {
+export async function seed(shouldExit: boolean = true) {
   await resetTables();
 
   logger.info('Generating synthetic network...');
@@ -80,8 +80,6 @@ async function seed() {
   );
 
   // PHASE 2 — now that every pole row exists, fill in the real parent.
-  // effectiveParentPoleId === dtId means "root of this DT" -> stays null
-  // (matches the schema convention: null parent = parent is the DT itself).
   const needsParent = network.poles.filter((p) => p.effectiveParentPoleId !== p.dtId);
 
   await batched(needsParent, async (chunk) => {
@@ -93,8 +91,6 @@ async function seed() {
   });
 
   // Every pole WITH a device starts 'unknown' until real telemetry arrives.
-  // Poles with no device get no pole_states row at all -- localization
-  // already treats a missing row as 'unknown' (see localizationService).
   const withDevice = network.poles.filter((p) => p.hasDevice);
   await batched(withDevice, (chunk) =>
     db
@@ -103,10 +99,29 @@ async function seed() {
   );
 
   logger.info('Seed complete.');
-  process.exit(0);
+  if (shouldExit) {
+    process.exit(0);
+  }
 }
 
-seed().catch((err) => {
-  console.error('Seed failed:', err);
-  process.exit(1);
-});
+export async function autoSeedIfEmpty() {
+  try {
+    const existingDts = await db.select({ id: transformers.id }).from(transformers).limit(1);
+    if (existingDts.length > 0) {
+      logger.info('Database already contains network topology. Skipping auto-seed.');
+      return;
+    }
+    logger.info('Database is empty. Running initial synthetic network seed...');
+    await seed(false);
+  } catch (err) {
+    logger.info('Auto-seed check/execution notice:', err instanceof Error ? err.message : err);
+  }
+}
+
+// Standalone execution check
+if (process.argv[1] && (process.argv[1].endsWith('seed.ts') || process.argv[1].endsWith('seed.js'))) {
+  seed(true).catch((err) => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  });
+}

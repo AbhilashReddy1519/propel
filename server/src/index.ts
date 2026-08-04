@@ -1,6 +1,7 @@
 import { App } from './app.js';
 import config from '@config/env.js';
 import logger from '@utils/logger.js';
+import { initializeDatabase } from './db/index.js';
 import { startIngestionWorker } from './workers/ingestionWorker.js';
 import { startHeartbeatWorker } from './workers/heartbeatWorker.js';
 
@@ -8,6 +9,9 @@ const app = new App().getApp();
 
 const startServer = async () => {
   try {
+    // Ensure DB tables exist & seed data if database is empty
+    await initializeDatabase();
+
     // Start server
     const server = app.listen(config.port, () => {
       logger.info(`Server running in ${config.env} mode`);
