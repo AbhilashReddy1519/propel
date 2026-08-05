@@ -6,6 +6,16 @@ This document records the chronological log of engineering decisions, technical 
 
 ## 1. Newest-First Decision Log
 
+### [2026-08-04] Force-Close Override for Device-less (Range Confidence) Incidents
+- **Context:** ~9% of poles have no telemetry device. When a fault's entire affected subtree is such a pole (a leaf with no device, no children), there is no device anywhere to ever send `power_restored` -- the incident can never telemetry-verify, and would sit in `resolved` permanently under the normal lifecycle.
+- **Decision:** Added `POST /incidents/:id/force-close`, a narrowly-scoped administrative override. It requires a mandatory note (stricter audit trail than the normal transition), and the server independently re-derives the affected subtree and re-checks for any device before allowing it -- a client claiming "no device" is never trusted on its own. Rejected with a 409 if any device exists in the subtree (telemetry confirmation should be used instead).
+- **Trade-Off:** This is a deliberate, principled exception to "never closed by a button alone," not a general loophole -- it only exists because telemetry confirmation is structurally impossible for this specific case, not merely unconfirmed.
+
+### [2026-08-04] `resolved` Guard Removed -- It Was Practically Unreachable
+- **Context:** The original transition guard rejected `resolved` while the affected pole was still dark. But telemetry confirming restoration and the auto-verify logic (`verifyRecoveredIncidents`) both fire in the same tick -- there was never a window where a human could click `Mark Resolved` before the ticket had already jumped to `verified`. Every real attempt to reach `resolved` returned a 409.
+- **Decision:** `resolved` is now unconditional -- it represents the crew's own unconfirmed report ("I believe I fixed it") and must be enterable regardless of what telemetry currently shows, which is the entire point of having a state distinct from `verified`. It also became a manual dead-end: no `resolved -> closed` path exists anymore, only `verified -> closed`. This closes a related gap the original design allowed: an operator could previously close a ticket straight from `resolved` without telemetry ever confirming the fix.
+- **Trade-Off:** None identified -- this is a strict correctness fix, not a scope trade-off.
+
 ### [2026-08-04] Telemetry-Only Ticket Closure Guard (`resolved` → `verified`)
 - **Context:** Control-room operators frequently close tickets based on crew verbal reports ("I fixed it"), leaving un-repaired dark spans active when repairs were incomplete.
 - **Decision:** Remove the manual `closed` action from `resolved` status. Once a crew marks a ticket `resolved`, it enters a `Resolved (pending telemetry)` state. The system requires physical telemetry (`power_restored` / `boot` events) to auto-verify and advance the ticket to `verified` → `closed`.
@@ -15,8 +25,9 @@ This document records the chronological log of engineering decisions, technical 
 
 ### [2026-08-04] AI Placement: Phrasing Header Only + Strict Template Fallback
 - **Context:** Incorporating AI into grid operations carries hallucination risks if used for core fault localization.
-- **Decision:** Restrict LLM usage (Anthropic Claude API) strictly to generating a plain-language header summary (`briefing`). Core localization remains 100% deterministic (graph frontier walking). Implemented a zero-latency string template fallback (`briefingSource: 'template'`) if the AI API times out, fails, or lacks an API key.
+- **Decision:** Restrict LLM usage strictly to generating a plain-language header summary (`briefing`). Core localization remains 100% deterministic (graph frontier walking). Implemented a zero-latency string template fallback (`briefingSource: 'template'`) if the AI API times out, fails, or lacks an API key.
 - **Trade-Off:** Keeps AI out of critical control paths while providing readable ticket summaries for non-technical dispatchers.
+- **Provider note (2026-08-04, later):** Originally implemented against the Anthropic API. Switched to Groq (`llama-3.3-70b-versatile`, OpenAI-compatible endpoint) because Anthropic does not provide a free tier and this project has no API budget. Because the AI call is fully abstracted behind `generateBriefing()` returning `{ text, source }`, the swap touched exactly one file and required no changes anywhere else -- a direct payoff of keeping the AI boundary narrow.
 
 ---
 
@@ -63,9 +74,11 @@ This document records the chronological log of engineering decisions, technical 
 
 ## 3. What Is Currently Fragile / Known Limitations
 
-1. **High-Cardinality Polling:**
+1. **Detection Latency for Silent-Firmware Devices (up to ~15 minutes, not the 2-minute target):**
+   - When a boundary pole successfully sends `power_lost` but its downstream children are among the ~8% of the fleet on firmware that never attempts a `power_lost` message (or among the ~30% of individual send attempts that simply fail), those specific children only get marked `dark` via heartbeat timeout -- which can take up to the full ~15-minute heartbeat interval if the fault happens shortly after their last heartbeat. Until then, `hasLiveDescendant` reads their last-known state, which could stall correct frontier detection at that boundary. Partially mitigated: a pole is treated as `unknown` (not stale `live`) the instant its heartbeat becomes overdue, rather than waiting for the separate heartbeat worker's next sweep -- but this cannot shrink the underlying ~15-minute physical bound for a device whose heartbeat window hasn't expired yet. This is a bounded, understood limitation of the system as specified, not a bug -- most of a fault's subtree self-reports within seconds via each device's own independent capacitor-backed send, so this tail case affects a minority of poles per fault, not the median detection time.
+2. **High-Cardinality Polling:**
    - The 4.5-second polling interval works seamlessly for control-room usage (<50 concurrent operators), but scaling to 10,000+ simultaneous browser sessions would cause database read load without a WebSocket pub/sub layer.
-2. **Geographic MST Topology Assumptions:**
+3. **Geographic MST Topology Assumptions:**
    - Prim's MST algorithm assumes grid poles connect to their nearest geographic neighbor. In dense urban environments with underground crossovers or multi-circuit lines, geographic proximity does not always match electrical connectivity.
-3. **Sequence Counter Wraparound:**
+4. **Sequence Counter Wraparound:**
    - Legacy 16-bit sensor devices wrap sequence counters from `65535` to `0`. The current worker expects monotonic integer increases; counter wraparounds without a `boot` event require manual sequence baseline resets.

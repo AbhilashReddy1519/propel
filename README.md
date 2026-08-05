@@ -25,7 +25,7 @@ docker compose up --build
 2. **Missing Topology Reconstruction (60% Case):** Geometrically infers missing feeder-pole graph structures using Minimum Spanning Tree (MST) algorithms rooted at the DT.
 3. **Noise & False-Positive Suppression:** Filters out impossible faults (dark sensor with a live downstream child) and silences alerts matching scheduled maintenance outage windows.
 4. **Telemetry-Gated Ticket Lifecycle:** Enforces real-world operator transitions (`detected` → `acknowledged` → `crew_assigned` → `resolved`). Tickets cannot be manually closed; they auto-verify to `verified` → `closed` only when physical telemetry reports restoration.
-5. **AI-Powered Ticket Briefings:** Generates human-readable, plain-language incident summary headers via Anthropic Claude LLM, with an automatic template fallback if the AI service is unavailable.
+5. **AI-Powered Ticket Briefings:** Generates human-readable, plain-language incident summary headers via the Groq API (Llama 3.3 70B), with an automatic template fallback if the AI service is unavailable.
 6. **Glanceable Control Room UI:** Built for zero-training operation at 2 a.m., featuring a 10-second glanceable status summary, synchronized GIS Leaflet map, background network context, and a visually isolated simulator panel for testing.
 
 ---
@@ -33,7 +33,7 @@ docker compose up --build
 ## 🌐 Public URL & Demo
 
 - **Live Application URL:** `http://localhost:5000` *(Or deployed platform link)*
-- **Interactive Demo Walkthrough:** [Walkthrough Documentation](file:///C:/Users/ABHILASH%20REDDY/.gemini/antigravity/brain/714612e1-5202-4e8b-9aa6-0a34672ab469/walkthrough.md)
+- **Interactive Demo Walkthrough:** ⚠️ TODO — replace with the 5-minute demo video link before submission. The current link is a local machine path (`file:///C:/Users/...`) that no reviewer can open; this must be fixed before submitting.
 
 ---
 

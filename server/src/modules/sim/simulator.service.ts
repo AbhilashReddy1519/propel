@@ -277,8 +277,27 @@ export async function repairIncident(incidentId: string, payload: RepairIncident
     : dtPoles.map((pole) => pole.id);
 
   const devicePoles = devicePolesFromIds(dtPoles, affectedPoleIds);
-  if (!devicePoles.length)
-    throw new BadRequestError('No device-equipped poles available to repair');
+
+  // Not an error -- this is a legitimate incident (the "no-device boundary"
+  // / range-confidence case, expected for ~9% of poles by spec). There is
+  // no device anywhere in this subtree to send restoration telemetry from,
+  // so telemetry-based repair is structurally impossible here, not just
+  // untried. Say so plainly and point at the administrative override
+  // instead of failing the request.
+  if (!devicePoles.length) {
+    return {
+      incidentId,
+      repairedDeviceCount: 0,
+      repairedPoleIds: [],
+      unrepairable: true,
+      reason:
+        "No pole in this incident's affected subtree has a telemetry device -- " +
+        'this is a "range" confidence incident and cannot be confirmed via telemetry. ' +
+        'Use the administrative force-close action instead (POST /incidents/:id/force-close).',
+      actor: payload.actor,
+      note: payload.note ?? null,
+    };
+  }
 
   const now = new Date();
   const baseSeq = Math.floor(Date.now() / 1000);

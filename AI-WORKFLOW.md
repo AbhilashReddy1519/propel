@@ -7,7 +7,7 @@ This document outlines the AI tools utilized during development, the delegation 
 ## 1. AI Tooling Stack
 
 - **Primary AI Coding Assistant:** Google Antigravity (AGY) Agentic AI Assistant
-- **Underlying LLM Models:** Anthropic Claude 3.5 Sonnet / Google Gemini 3.6 Flash
+- **Underlying LLM Models:** Anthropic Claude 3.5 Sonnet / Google Gemini (verify the exact Gemini version string here before submission -- "3.6 Flash" as originally written doesn't match a Google model naming pattern either of us could confirm; check Antigravity's own settings/docs for the actual model identifier rather than leaving an unverified guess in a submitted document)
 - **IDE Environment:** VS Code with Antigravity Extension & CLI Tooling
 
 ---
@@ -50,6 +50,19 @@ This document outlines the AI tools utilized during development, the delegation 
 - **What the AI Got Wrong:** The AI included `next/font/google` font loaders (`Geist`, `Geist_Mono`) in `client/app/layout.tsx`.
 - **How It Was Caught:** Executing `next build` inside a network-restricted container threw an unhandled build exception trying to download font binaries from `fonts.googleapis.com`.
 - **How It Was Fixed:** Removed `next/font/google` imports from `layout.tsx` and configured a system font stack (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`) in `globals.css`.
+
+---
+
+### Case 4: `resolved` Transition Guard Contradicted the Auto-Verify Logic
+- **What Went Wrong:** An early implementation of the ticket state machine rejected the `resolved` transition with a 409 whenever the affected pole was still dark. This seemed correct in isolation ("don't let a crew mark something fixed if it visibly isn't"), but it interacted badly with the separate telemetry auto-verify logic: the instant a pole *did* come back live, the system jumped straight to `verified` in the same tick, before a human could possibly click `Mark Resolved` first. The net effect: `resolved` was reachable in theory but unreachable in every real test.
+- **How It Was Caught:** Manually clicking through the full ticket lifecycle in the actual UI (Acknowledge -> Assign Crew -> Mark Resolved) and hitting a 409 every single time, regardless of pole state -- this was not a corner case, it failed on every attempt.
+- **How It Was Fixed:** Removed the dark-check from `resolved` entirely. `resolved` now represents the crew's own unconfirmed report and must be reachable regardless of current telemetry -- that asymmetry (enterable anytime, but a manual dead-end once entered) is the actual design intent. Also removed a previously-allowed `resolved -> closed` manual path that would have let an operator bypass telemetry confirmation entirely.
+
+---
+
+### Case 5: Anthropic API Has No Free Tier -- Provider Swap to Groq
+- **What Happened:** The AI briefing feature was originally built against the Anthropic API. During testing, this proved impractical -- Anthropic does not offer a free tier, and this project has no budget for paid API calls.
+- **How It Was Handled:** Swapped the implementation to Groq's OpenAI-compatible endpoint (`llama-3.3-70b-versatile`, free tier available). Because the AI call was already isolated behind a single `generateBriefing()` function returning `{ text, source }`, the swap required changing exactly one file (`briefingService.ts`) -- no changes to the incident service, the schema, or any UI component. This is presented here as a concrete payoff of the "AI is a thin phrasing layer, not embedded logic" decision (see `DECISIONS.md`), not just a workflow footnote.
 
 ---
 

@@ -65,9 +65,9 @@ npm run dev            # Starts Next.js App on http://localhost:5000
 | :--- | :--- | :--- | :--- |
 | `PORT` | Yes | `3000` | HTTP port for the Express backend server |
 | `NODE_ENV` | Yes | `development` | Environment mode (`development` / `production`) |
-| `DATABASE_URL` | Yes | `postgres://Abhilash:Abhi1234@localhost:4000/propel_db` | PostgreSQL connection URI |
+| `DATABASE_URL` | Yes | `postgres://<user>:<password>@localhost:4000/propel_db` | PostgreSQL connection URI |
 | `CORS_ORIGIN` | Yes | `http://localhost:3000,http://localhost:5000` | Allowed CORS origin URLs |
-| `ANTHROPIC_API_KEY` | No | `""` | Anthropic Claude API key for AI briefings (falls back to template if empty) |
+| `GROQ_API_KEY` | No | `""` | Groq API key for AI briefings (falls back to template if empty) |
 
 ### Frontend (`client/.env.local`)
 
@@ -96,7 +96,13 @@ Perform this verification sequence after starting the application:
    - Observe that `Mark Resolved` shows the notice: *"Marked resolved by crew, awaiting telemetry confirmation. No manual action can advance it from here."*
 4. **Verify Telemetry Auto-Verification:**
    - In the Simulator panel under `Hardware Telemetry Repair (Sim)`, click `🛠️ Restore Physical Telemetry`.
-   - Observe that the ticket auto-advances from `Resolved (pending)` → `Verified` → `Closed` within 4.5 seconds.
+   - Observe that the ticket auto-advances from `Resolved (pending)` → `Verified` on its own (no button click), typically within a couple seconds.
+   - **`Closed` is NOT automatic** — this is a deliberate design choice, not a gap. Click `Close Ticket` manually as the operator's final sign-off after telemetry has confirmed the fix. Auto-closing without an explicit human acknowledgment would remove the last operator checkpoint from the lifecycle.
+5. **Verify the no-device / range-confidence path (force-close):**
+   - Inject a `Span` fault targeting a pole with no device attached (check `/network/dts/:dtId/poles` for `hasDevice: false` entries, or repeatedly inject span faults — roughly 9% of poles have no device per spec).
+   - Confirm the resulting incident shows `range` confidence.
+   - Attempting `Restore Physical Telemetry` on this incident should report `unrepairable: true` with an explanation, not a 400 error.
+   - Confirm `POST /incidents/:id/force-close` (with a mandatory `note`) succeeds only for this incident, and rejects with a 409 if attempted on any incident where a device exists in the affected subtree.
 
 ---
 
@@ -121,6 +127,17 @@ Perform this verification sequence after starting the application:
 - **Symptom:** Attempting `Mark Resolved` on an un-repaired pole generated a `409 Conflict` error banner. When clicking a different incident, the same 409 error banner remained visible.
 - **Root Cause:** `TransitionActions` maintained local `conflictError` state, which React preserved when reusing component instances upon prop updates.
 - **Fix:** Added `key={incident.id}` to `<TransitionActions />` in `IncidentDetail.tsx` and implemented a `useEffect` hook listening to `incident.id` to clear error state upon selection change.
+
+### 5. `resolved` Status Was Practically Unreachable (409 on every real attempt)
+- **Symptom:** Clicking `Mark Resolved` returned a `409 Conflict` in every realistic test scenario, making the status impossible to demonstrate.
+- **Root Cause:** The original transition guard rejected `resolved` while the affected pole was still dark. But the moment telemetry *did* confirm the pole live (via the simulator's Repair button), `verifyRecoveredIncidents` auto-promoted the ticket straight to `verified` in the same tick -- there was never a window in which the manual transition could legally succeed. The guard and the auto-verify logic were fighting each other.
+- **Fix:** Removed the dark-check from the `resolved` transition entirely -- `resolved` now represents the crew's unconfirmed report and is always reachable from `crew_assigned`. It became a manual dead-end (no `resolved -> closed` path); only telemetry can advance a ticket past it, to `verified`.
+- **Correct demo flow:** Assign Crew -> **Mark Resolved (now succeeds immediately, before repairing)** -> use the simulator's Repair button -> ticket auto-advances to `Verified` on its own -> operator manually clicks `Close Ticket`.
+
+### 6. Simulator Repair Threw a 400 on Device-less Boundary Poles
+- **Symptom:** `POST /sim/repair/:incidentId` returned `400 Bad Request: No device-equipped poles available to repair` for a valid, correctly-detected incident.
+- **Root Cause:** ~9% of poles have no telemetry device (per spec). When a fault's entire affected subtree happens to be a single device-less leaf pole (the "range confidence" case), there is no device anywhere to send restoration telemetry from -- this is a legitimate incident, not an invalid request, but the endpoint treated it as an error.
+- **Fix:** The repair endpoint now returns a clear, non-error response (`unrepairable: true` with an explanation) instead of a 400. A new administrative override, `POST /incidents/:id/force-close`, allows closing such incidents directly -- but only after the server independently re-verifies that no device exists anywhere in the affected subtree (never trusts the client's claim), and only for `range`-confidence incidents, with a mandatory note for the audit trail.
 
 ---
 

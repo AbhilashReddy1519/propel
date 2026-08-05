@@ -2,8 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { incidents } from '@/db/schema/incidents.schema.js';
-import { transitionSchema } from './incident.validations.js';
-import { transitionIncident } from '@/services/incidentTransitionService.js';
+import { transitionSchema, forceCloseSchema } from './incident.validations.js';
+import { transitionIncident, forceCloseIncident } from '@/services/incidentTransitionService.js';
 import { BadRequestError, NotFoundError } from '@/exceptions/http.exception.js';
 
 export async function listIncidents(req: Request, res: Response, next: NextFunction) {
@@ -43,6 +43,20 @@ export async function postTransition(req: Request, res: Response, next: NextFunc
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     if (!id) throw new BadRequestError('Incident ID is required');
     const updated = await transitionIncident(id, parsed.data);
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postForceClose(req: Request, res: Response, next: NextFunction) {
+  try {
+    const parsed = forceCloseSchema.safeParse(req.body);
+    if (!parsed.success)
+      throw new BadRequestError(parsed.error.issues.map((i) => i.message).join(', '));
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    if (!id) throw new BadRequestError('Incident ID is required');
+    const updated = await forceCloseIncident(id, { ...parsed.data, status: 'closed' });
     res.json(updated);
   } catch (err) {
     next(err);

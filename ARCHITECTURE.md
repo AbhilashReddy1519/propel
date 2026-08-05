@@ -39,7 +39,7 @@ This document details the architectural design, graph localization algorithms, t
 |            |                                                      |               |
 |            v                                                      v               |
 |  +---------------------+                                +-------------------+     |
-|  | Anthropic Claude API|                                | PostgreSQL DB     |     |
+|  | Groq API (Llama 3.3) |                                | PostgreSQL DB     |     |
 |  | (Briefing Phrasing) |                                | (Drizzle ORM)     |     |
 |  +---------------------+                                +-------------------+     |
 +-----------------------------------------------------------------------------------+
@@ -172,6 +172,7 @@ All endpoints reside under `/api/v1`.
 | `GET` | `/incidents?open=true` | List active grid incidents | `open=true` | `IncidentRow[]` |
 | `GET` | `/incidents/:id` | Get incident details | None | `IncidentRow` |
 | `POST` | `/incidents/:id/transition` | Transition ticket lifecycle | `{ status, actor, note? }` | Updated `IncidentRow` |
+| `POST` | `/incidents/:id/force-close` | Administrative override: close an incident with no telemetry-confirmable device in its affected subtree (`range` confidence only, note mandatory) | `{ actor, note }` | Updated `IncidentRow` |
 | `GET` | `/network/dts` | List DT network summaries | None | `DtSummary[]` |
 | `GET` | `/network/dts/:dtId/poles` | List poles under a DT | None | `PoleSummary[]` |
 | `POST` | `/sim/inject-fault` | Inject span/dt/feeder fault | `{ type, dtId, targetId? }` | `{ success, description, ... }` |
@@ -204,10 +205,10 @@ All endpoints reside under `/api/v1`.
 ## 8. AI Feature Justification & Architecture
 
 ### Feature: Plain-Language Ticket Briefing Header
-The Anthropic Claude API (`claude-3-5-sonnet`) generates a concise, one-sentence plain-language briefing (e.g., *"Power loss detected across 20 poles downstream of Transformer D-0204 near PIN 560079"*).
+The Groq API (`llama-3.3-70b-versatile`) generates a concise, one-sentence plain-language briefing (e.g., *"Power loss detected across 20 poles downstream of Transformer D-0204 near PIN 560079"*).
 
 ```
-Structured Incident Data ---> Anthropic Claude API ---> Plain-Language Briefing ("✦ AI")
+Structured Incident Data ---> Groq API (Llama 3.3) ---> Plain-Language Briefing ("✦ AI")
                                     |
                             (Timeout / Error)
                                     v
@@ -216,4 +217,5 @@ Structured Incident Data ---> Anthropic Claude API ---> Plain-Language Briefing 
 
 ### Why AI Is Used ONLY for Briefing Phrasing:
 - **Fault Localization MUST NOT use an LLM:** Graph frontier walking requires 100% deterministic mathematical accuracy, zero execution cost, sub-millisecond speed, and 100% auditability. An LLM is probabilistic, slow, expensive, and subject to hallucinations.
-- **Template Fallback Guarantee:** If the Anthropic API is unreachable, times out, or lacks an API key, the system seamlessly falls back to a deterministic string template (`briefingSource: 'template'`), ensuring zero service disruption.
+- **Template Fallback Guarantee:** If the Groq API is unreachable, times out, or lacks an API key, the system seamlessly falls back to a deterministic string template (`briefingSource: 'template'`), ensuring zero service disruption.
+- **Provider swap note:** this feature originally targeted the Anthropic API; it was switched to Groq (OpenAI-compatible endpoint, `llama-3.3-70b-versatile`) because Anthropic does not offer a free API tier and this project has no budget for paid API usage. The abstraction (`generateBriefing()` returning `{ text, source }`) made this a same-day swap with no changes required anywhere else in the codebase -- worth noting as a concrete case of the "AI is a phrasing layer, not core logic" decision paying off: swapping providers touched one file.

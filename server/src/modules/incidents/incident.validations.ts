@@ -6,3 +6,11 @@ export const transitionSchema = z.object({
   note: z.string().optional(),
 });
 export type TransitionPayload = z.infer<typeof transitionSchema>;
+
+// Note is mandatory here (unlike transitionSchema) -- this bypasses
+// telemetry confirmation, so the audit trail requirement is stricter.
+export const forceCloseSchema = z.object({
+  actor: z.string().min(1),
+  note: z.string().min(1, 'A note is required to force-close an incident.'),
+});
+export type ForceClosePayload = z.infer<typeof forceCloseSchema>;
