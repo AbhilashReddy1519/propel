@@ -32,8 +32,8 @@ docker compose up --build
 
 ## 🌐 Public URL & Demo
 
-- **Live Application URL:** `http://localhost:5000` *(Or deployed platform link)*
-- **Interactive Demo Walkthrough:** ⚠️ TODO — replace with the 5-minute demo video link before submission. The current link is a local machine path (`file:///C:/Users/...`) that no reviewer can open; this must be fixed before submitting.
+- **Live Application URL:** `https://propel-reddy22.vercel.app`
+- **Interactive Demo Walkthrough:** `https://drive.google.com/file/d/1CNee55NFAc6bC8qU8t8P3XnSfkfQDUCW/view?usp=sharing`
 
 ---
 

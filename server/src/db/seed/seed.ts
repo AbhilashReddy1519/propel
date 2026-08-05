@@ -8,7 +8,7 @@ import { transformers } from '../schema/transformers.schema.js';
 import { poles } from '../schema/poles.schema.js';
 import { poleStates } from '../schema/polesStates.schema.js';
 
-const BATCH_SIZE = 500;
+const BATCH_SIZE = 1000;
 
 async function batched<T>(rows: T[], fn: (chunk: T[]) => Promise<unknown>) {
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
@@ -62,6 +62,7 @@ export async function seed(shouldExit: boolean = true) {
     ),
   );
 
+  logger.info("Phase 1 started");
   // PHASE 1 — insert every pole, parent left null.
   await batched(network.poles, (chunk) =>
     db.insert(poles).values(
@@ -79,6 +80,7 @@ export async function seed(shouldExit: boolean = true) {
     ),
   );
 
+  logger.info('Phase 2 started');
   // PHASE 2 — now that every pole row exists, fill in the real parent.
   const needsParent = network.poles.filter((p) => p.effectiveParentPoleId !== p.dtId);
 
@@ -90,6 +92,7 @@ export async function seed(shouldExit: boolean = true) {
     );
   });
 
+  logger.info("Every pole WITH a device starts 'unknown' until real telemetry arrives.");
   // Every pole WITH a device starts 'unknown' until real telemetry arrives.
   const withDevice = network.poles.filter((p) => p.hasDevice);
   await batched(withDevice, (chunk) =>
